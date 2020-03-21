@@ -1,0 +1,99 @@
+#!/bin/bash
+set -e
+
+USAGE="usage: $0 [-w <width>] [-h <height>] [-o <offset>] <score>"
+WIDTH=1280
+HEIGHT=720
+OFFSET=2.8
+
+while getopts ':w:h:o:' opt
+do
+    case $opt in
+        w) WIDTH=$OPTARG;;
+        h) HEIGHT=$OPTARG;;
+        o) OFFSET=$OPTARG;;
+        \?) echo $USAGE
+            exit 1;;
+    esac
+done
+
+SCORE=${@:$OPTIND:1}
+
+if [[ -z $SCORE ]]; then
+    echo $USAGE
+    exit 1
+fi
+
+if [[ ! -f $SCORE ]]; then
+    echo "Score $1 does not exist."
+    exit 1
+fi
+
+DIR=$(dirname $SCORE)
+BASE=$DIR/$(basename $SCORE .mscz)
+SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo $SELF
+
+if ! command -v convert > /dev/null; then
+    echo "ImageMagick not installed."
+    exit 1
+fi
+
+if command -v ffmpeg > /dev/null; then
+    export FFMPEG=ffmpeg
+fi
+if command -v ffmpeg.exe > /dev/null; then
+    export FFMPEG=ffmpeg.exe
+fi
+if [[ -z $FFMPEG ]]; then
+    echo "ffmpeg not found, check PATH!"
+    exit 1
+fi
+
+if command -v mscore > /dev/null; then
+    export MUSESCORE=mscore
+fi
+if command -v musescore > /dev/null; then
+    export MUSESCORE=musescore
+fi
+if command -v MuseScore3.exe > /dev/null; then
+    export MUSESCORE=MuseScore3.exe
+fi
+if [[ -z $MUSESCORE ]]; then
+    echo "MuseScore not found, check PATH!"
+    exit 1
+fi
+
+# see https://github.com/ekuiter/MIDIVisualizer
+if uname -r | grep -q Microsoft; then
+    export MIDI_VISUALIZER=$SELF/MIDIVisualizer.exe
+else
+    export MIDI_VISUALIZER=$SELF/MIDIVisualizer
+fi
+
+echo "Exporting MIDI ..."
+$MUSESCORE -o $BASE.mid $SCORE
+
+echo "Exporting PDF ..."
+$MUSESCORE -o $BASE.pdf $SCORE
+
+echo "Exporting MP3 ..."
+$MUSESCORE -o $BASE.mp3 $SCORE
+
+echo "Exporting JPG ..."
+$MUSESCORE -o $BASE.png $SCORE
+convert $BASE-1.png -resize 50% -background white -flatten $BASE.jpg
+rm $BASE-*.png
+
+echo "Exporting MP4 ..."
+rm -rf $DIR/tmp
+mkdir -p $DIR/tmp
+cp $SELF/state.ini $DIR/state.ini
+$MIDI_VISUALIZER $BASE.mid $DIR/state.ini $DIR/tmp $WIDTH $HEIGHT
+rm $DIR/state.ini
+$FFMPEG -y -framerate 60 -i $DIR/tmp/output_%04d.png -c:v libx264 -crf 0 $DIR/tmp.mp4
+$FFMPEG -y -i $DIR/tmp.mp4 -itsoffset $OFFSET -i $BASE.mp3 -c:v copy -c:a aac -shortest $BASE.mp4
+rm -f $DIR/tmp.mp4
+rm -rf $DIR/tmp
+
+echo "Done."
