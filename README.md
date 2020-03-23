@@ -11,7 +11,7 @@ sudo add-apt-repository ppa:mscore-ubuntu/mscore3-stable
 sudo apt install imagemagick ffmpeg musescore3
 git clone https://github.com/ekuiter/bemuse.git
 cd bemuse
-wsl ./bemuse [-w <width>] [-h <height>] [-f <framerate>] [-o <offset>] [-v] [-k] <score>
+./bemuse <score> # for options, see ./bemuse
 ```
 
 #### Windows/WSL
@@ -23,7 +23,7 @@ In cmd.exe, run:
 wsl sudo apt install imagemagick ffmpeg
 git clone https://github.com/ekuiter/bemuse.git
 cd bemuse
-wsl ./bemuse [-w <width>] [-h <height>] [-f <framerate>] [-o <offset>] [-v] [-k] <score>
+wsl bemuse <score> # for options, see wsl bemuse
 ```
 
 Keep in mind that this will not generally work with absolute paths.

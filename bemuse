@@ -1,77 +1,59 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [-w <width>] [-h <height>] [-f <framerate>] [-o <offset>] [-v] [-k] <score>"
+USAGE="usage: $0 [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--offset=<sec>] [--visualize] [--keep] <score>"
 WIDTH=1280
 HEIGHT=720
 FRAMERATE=60
 OFFSET=2.8
+COLORKEY=0x000000:0.1:0.2
 
-while getopts ':w:h:f:o:vk' opt
-do
-    case $opt in
-        w) WIDTH=$OPTARG;;
-        h) HEIGHT=$OPTARG;;
-        f) FRAMERATE=$OPTARG;;
-        o) OFFSET=$OPTARG;;
-        v) VISUALIZE=y;;
-        k) KEEP=y;;
-        \?) echo $USAGE
-            exit 1;;
-    esac
+die() { echo "$*" >&2; exit 2; }
+needs_arg() { if [ -z "$OPTARG" ]; then die "No arg for --$OPT option"; fi; }
+
+while getopts :-: OPT; do
+  if [ "$OPT" = "-" ]; then
+    OPT="${OPTARG%%=*}"
+    OPTARG="${OPTARG#$OPT}"
+    OPTARG="${OPTARG#=}"
+  fi
+  case "$OPT" in
+    width )     needs_arg; WIDTH="$OPTARG" ;;
+    height )    needs_arg; HEIGHT="$OPTARG" ;;
+    framerate ) needs_arg; FRAMERATE="$OPTARG" ;;
+    chroma )    needs_arg; CHROMA="$OPTARG" ;;
+    colorkey )  needs_arg; COLORKEY="$OPTARG" ;;
+    scale )     needs_arg; SCALE="$OPTARG" ;;
+    offset )    needs_arg; OFFSET="$OPTARG" ;;
+    visualize ) VISUALIZE=true ;;
+    keep )      KEEP=true ;;
+    ??* )       die "Illegal option --$OPT" ;;
+    \? )        die $USAGE ;;
+  esac
 done
+shift $((OPTIND-1))
+SCORE=$@
 
-SCORE=${@:$OPTIND:1}
-
-if [[ -z $SCORE ]]; then
-    echo $USAGE
-    exit 1
-fi
-
-if [[ ! -f $SCORE ]]; then
-    echo "Score $SCORE does not exist."
-    exit 1
-fi
+if [[ -z "$SCORE" ]];                     then die $USAGE; fi
+if [[ ! -f "$SCORE" ]];                   then die "Score $SCORE does not exist."; fi
+if ! command -v convert > /dev/null;      then die "ImageMagick not installed."; fi
+if command -v ffmpeg > /dev/null;         then FFMPEG=ffmpeg; fi
+if command -v ffmpeg.exe > /dev/null;     then FFMPEG=ffmpeg.exe; fi
+if [[ -z $FFMPEG ]];                      then die "ffmpeg not found, check PATH!"; fi
+if command -v mscore > /dev/null;         then MUSESCORE=mscore; fi
+if command -v musescore > /dev/null;      then MUSESCORE=musescore; fi
+if command -v MuseScore3.exe > /dev/null; then MUSESCORE=MuseScore3.exe; fi
+if [[ -z $MUSESCORE ]];                   then die "MuseScore not found, check PATH!"; fi
 
 DIR=$(dirname "$SCORE")
 BASE=$DIR/$(basename "$SCORE" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if ! command -v convert > /dev/null; then
-    echo "ImageMagick not installed."
-    exit 1
-fi
-
-if command -v ffmpeg > /dev/null; then
-    export FFMPEG=ffmpeg
-fi
-if command -v ffmpeg.exe > /dev/null; then
-    export FFMPEG=ffmpeg.exe
-fi
-if [[ -z $FFMPEG ]]; then
-    echo "ffmpeg not found, check PATH!"
-    exit 1
-fi
-
-if command -v mscore > /dev/null; then
-    export MUSESCORE=mscore
-fi
-if command -v musescore > /dev/null; then
-    export MUSESCORE=musescore
-fi
-if command -v MuseScore3.exe > /dev/null; then
-    export MUSESCORE=MuseScore3.exe
-fi
-if [[ -z $MUSESCORE ]]; then
-    echo "MuseScore not found, check PATH!"
-    exit 1
-fi
-
 # see https://github.com/ekuiter/MIDIVisualizer
 if uname -r | grep -q Microsoft; then
-    export MIDI_VISUALIZER="$SELF/MIDIVisualizer.exe"
+    MIDI_VISUALIZER="$SELF/MIDIVisualizer.exe"
 else
-    export MIDI_VISUALIZER="$SELF/MIDIVisualizer"
+    MIDI_VISUALIZER="$SELF/MIDIVisualizer"
 fi
 
 if [[ ! -z $VISUALIZE ]]; then
@@ -84,16 +66,22 @@ fi
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mid" ]]; then
     echo "Exporting MIDI ..."
     $MUSESCORE -o "$BASE.mid" "$SCORE"
+else
+    echo "Keeping MIDI."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.pdf" ]]; then
     echo "Exporting PDF ..."
     $MUSESCORE -o "$BASE.pdf" "$SCORE"
+else
+    echo "Keeping PDF."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
     echo "Exporting MP3 ..."
     $MUSESCORE -o "$BASE.mp3" "$SCORE"
+else
+    echo "Keeping MP3."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]; then
@@ -101,6 +89,8 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]; then
     $MUSESCORE -o "$BASE.png" "$SCORE"
     convert "$BASE-1.png" -resize 50% -background white -flatten "$BASE.jpg"
     rm "$BASE-"*".png"
+else
+    echo "Keeping JPG."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
@@ -112,20 +102,34 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
         $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
         rm "$DIR/state.ini"
     fi
-    NUM=$(ls "$DIR/tmp" | head -n1 | sed "s/[^0-9]*//g" | tr -d "\n" | wc -c)
-    OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
+    SOME_FRAME=$(ls "$DIR/tmp" | head -n1)
+    NUM=$(echo $SOME_FRAME | sed "s/[^0-9]*//g" | tr -d "\n" | wc -c)
     $FFMPEG -y -framerate $FRAMERATE -i "$DIR/tmp/output_%0${NUM}d.png" -c:v libx264 -pix_fmt yuv420p -crf 0 "$DIR/tmp.mp4"
-    if [[ ! -z $CHROMAKEY ]]; then
-        $FFMPEG -y -i "$DIR/tmp.mp4" -i $CHROMAKEY \
-            -filter_complex "[0:v]colorkey=0x000000:0.1:0.2[ckout];[1:v]scale=$WIDTH:$HEIGHT[scale];[scale][ckout]overlay[out]" -map "[out]" "$DIR/tmp2.mp4"
+    if [[ ! -z $CHROMA ]]; then
+        WIDTH=$(cat "$DIR/tmp/$SOME_FRAME" | identify -format "%w" -)
+        HEIGHT=$(cat "$DIR/tmp/$SOME_FRAME" | identify -format "%h" -)
+        if [[ -z $SCALE ]]; then
+            SCALE="$WIDTH:$HEIGHT"
+        fi
+        DURATION=$($FFMPEG -i "$DIR/tmp.mp4" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
+            awk '{ split($1, A, ":"); split(A[3], B, "."); print 3600*A[1] + 60*A[2] + B[1] }')
+        $FFMPEG -y -i "$CHROMA" -i "$DIR/tmp.mp4" -filter_complex "
+            color = black:${WIDTH}x${HEIGHT}, trim = duration=$DURATION [background];
+            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION [chroma];
+            [1:v] colorkey = $COLORKEY [keyboard];
+            [background][chroma] overlay = W/2-w/2:H/2-h/2 [background2];
+            [background2][keyboard] overlay [out]" -map "[out]" "$DIR/tmp2.mp4"
     else
         cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
     fi
+    OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
     $FFMPEG -y -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -shortest "$BASE.mp4"
     rm -f "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
     if [[ -z $KEEP ]]; then
         rm -rf "$DIR/tmp"
     fi
+else
+    echo "Keeping MP4."
 fi
 
 echo "Done."
