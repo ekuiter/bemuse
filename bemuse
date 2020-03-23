@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [-w <width>] [-h <height>] [-f <framerate>] [-o <offset>] [-v] <score>"
+USAGE="usage: $0 [-w <width>] [-h <height>] [-f <framerate>] [-o <offset>] [-v] [-k] <score>"
 WIDTH=1280
 HEIGHT=720
 FRAMERATE=60
 OFFSET=2.8
 
-while getopts ':w:h:f:o:v' opt
+while getopts ':w:h:f:o:vk' opt
 do
     case $opt in
         w) WIDTH=$OPTARG;;
@@ -15,6 +15,7 @@ do
         f) FRAMERATE=$OPTARG;;
         o) OFFSET=$OPTARG;;
         v) VISUALIZE=y;;
+        k) KEEP=y;;
         \?) echo $USAGE
             exit 1;;
     esac
@@ -28,14 +29,13 @@ if [[ -z $SCORE ]]; then
 fi
 
 if [[ ! -f $SCORE ]]; then
-    echo "Score $1 does not exist."
+    echo "Score $SCORE does not exist."
     exit 1
 fi
 
-DIR=$(dirname $SCORE)
-BASE=$DIR/$(basename $SCORE .mscz)
+DIR=$(dirname "$SCORE")
+BASE=$DIR/$(basename "$SCORE" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-echo $SELF
 
 if ! command -v convert > /dev/null; then
     echo "ImageMagick not installed."
@@ -69,42 +69,56 @@ fi
 
 # see https://github.com/ekuiter/MIDIVisualizer
 if uname -r | grep -q Microsoft; then
-    export MIDI_VISUALIZER=$SELF/MIDIVisualizer.exe
+    export MIDI_VISUALIZER="$SELF/MIDIVisualizer.exe"
 else
-    export MIDI_VISUALIZER=$SELF/MIDIVisualizer
+    export MIDI_VISUALIZER="$SELF/MIDIVisualizer"
 fi
 
 if [[ ! -z $VISUALIZE ]]; then
-    cp $SELF/state.ini $DIR/state.ini
-    $MIDI_VISUALIZER $BASE.mid $DIR/state.ini
-    rm $DIR/state.ini
+    cp "$SELF/state.ini" "$DIR/state.ini"
+    $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini"
+    rm "$DIR/state.ini"
     exit 0
 fi
 
-echo "Exporting MIDI ..."
-$MUSESCORE -o $BASE.mid $SCORE
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.mid" ]]; then
+    echo "Exporting MIDI ..."
+    $MUSESCORE -o "$BASE.mid" "$SCORE"
+fi
 
-echo "Exporting PDF ..."
-$MUSESCORE -o $BASE.pdf $SCORE
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.pdf" ]]; then
+    echo "Exporting PDF ..."
+    $MUSESCORE -o "$BASE.pdf" "$SCORE"
+fi
 
-echo "Exporting MP3 ..."
-$MUSESCORE -o $BASE.mp3 $SCORE
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
+    echo "Exporting MP3 ..."
+    $MUSESCORE -o "$BASE.mp3" "$SCORE"
+fi
 
-echo "Exporting JPG ..."
-$MUSESCORE -o $BASE.png $SCORE
-convert $BASE-1.png -resize 50% -background white -flatten $BASE.jpg
-rm $BASE-*.png
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]; then
+    echo "Exporting JPG ..."
+    $MUSESCORE -o "$BASE.png" "$SCORE"
+    convert "$BASE-1.png" -resize 50% -background white -flatten "$BASE.jpg"
+    rm "$BASE-"*".png"
+fi
 
-echo "Exporting MP4 ..."
-rm -rf $DIR/tmp
-mkdir -p $DIR/tmp
-cp $SELF/state.ini $DIR/state.ini
-$MIDI_VISUALIZER $BASE.mid $DIR/state.ini $DIR/tmp $WIDTH $HEIGHT $FRAMERATE
-rm $DIR/state.ini
-NUM=$(ls tmp | head -n1 | sed 's/[^0-9]*//g' | tr -d '\n' | wc -c)
-$FFMPEG -y -framerate $FRAMERATE -i $DIR/tmp/output_%0${NUM}d.png -c:v libx264 -pix_fmt yuv420p -crf 0 $DIR/tmp.mp4
-$FFMPEG -y -i $DIR/tmp.mp4 -itsoffset $OFFSET -i $BASE.mp3 -c:v copy -c:a aac -shortest $BASE.mp4
-rm -f $DIR/tmp.mp4
-rm -rf $DIR/tmp
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
+    echo "Exporting MP4 ..."
+    if [[ -z $KEEP ]] || [[ ! -d "$DIR/tmp" ]]; then
+        rm -rf "$DIR/tmp"
+        mkdir -p "$DIR/tmp"
+        cp "$SELF/state.ini" "$DIR/state.ini"
+        $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
+        rm "$DIR/state.ini"
+    fi
+    NUM=$(ls "$DIR/tmp" | head -n1 | sed 's/[^0-9]*//g' | tr -d '\n' | wc -c)
+    $FFMPEG -y -framerate $FRAMERATE -i "$DIR/tmp/output_%0${NUM}d.png" -c:v libx264 -pix_fmt yuv420p -crf 0 "$DIR/tmp.mp4"
+    $FFMPEG -y -i "$DIR/tmp.mp4" -itsoffset $OFFSET -i "$BASE.mp3" -c:v copy -c:a aac -shortest "$BASE.mp4"
+    rm -f "$DIR/tmp.mp4"
+    if [[ -z $KEEP ]]; then
+        rm -rf "$DIR/tmp"
+    fi
+fi
 
 echo "Done."
