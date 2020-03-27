@@ -5,7 +5,7 @@ USAGE="usage: $0 [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<f
 WIDTH=1280
 HEIGHT=720
 FRAMERATE=60
-OFFSET=2.8
+OFFSET=2.85
 COLORKEY=0x000000:0.1:0.2
 
 die() { echo "$*" >&2; exit 2; }
@@ -56,18 +56,22 @@ else
     MIDI_VISUALIZER="$SELF/MIDIVisualizer"
 fi
 
-if [[ ! -z $VISUALIZE ]]; then
-    cp "$SELF/state.ini" "$DIR/state.ini"
-    $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini"
-    rm "$DIR/state.ini"
-    exit 0
-fi
-
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mid" ]]; then
     echo "Exporting MIDI ..."
     $MUSESCORE -o "$BASE.mid" "$SCORE"
 else
     echo "Keeping MIDI."
+fi
+
+if [[ ! -z $VISUALIZE ]]; then
+	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		cp "$SELF/state.ini" "$DIR/state.ini"
+	fi
+	$MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini"
+	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		rm "$DIR/state.ini"
+	fi
+	exit 0
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.pdf" ]]; then
@@ -98,9 +102,13 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     if [[ -z $KEEP ]] || [[ ! -d "$DIR/tmp" ]]; then
         rm -rf "$DIR/tmp"
         mkdir -p "$DIR/tmp"
-        cp "$SELF/state.ini" "$DIR/state.ini"
+	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		cp "$SELF/state.ini" "$DIR/state.ini"
+	fi
         $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
-        rm "$DIR/state.ini"
+	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		rm "$DIR/state.ini"
+	fi
     fi
     SOME_FRAME=$(ls "$DIR/tmp" | head -n1)
     NUM=$(echo $SOME_FRAME | sed "s/[^0-9]*//g" | tr -d "\n" | wc -c)
