@@ -5,7 +5,7 @@ USAGE="usage: $0 [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<f
 WIDTH=1280
 HEIGHT=720
 FRAMERATE=60
-OFFSET=2.85
+OFFSET=3
 COLORKEY=0x000000:0.1:0.2
 
 die() { echo "$*" >&2; exit 2; }
@@ -102,13 +102,13 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     if [[ -z $KEEP ]] || [[ ! -d "$DIR/tmp" ]]; then
         rm -rf "$DIR/tmp"
         mkdir -p "$DIR/tmp"
-	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-		cp "$SELF/state.ini" "$DIR/state.ini"
-	fi
+        if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+            cp "$SELF/state.ini" "$DIR/state.ini"
+        fi
         $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
-	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-		rm "$DIR/state.ini"
-	fi
+        if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+            rm "$DIR/state.ini"
+        fi
     fi
     SOME_FRAME=$(ls "$DIR/tmp" | head -n1)
     NUM=$(echo $SOME_FRAME | sed "s/[^0-9]*//g" | tr -d "\n" | wc -c)
@@ -138,6 +138,13 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     fi
 else
     echo "Keeping MP4."
+fi
+
+if [[ -z $KEEP ]] || [[ ! -f "$BASE.thumb.jpg" ]]; then
+    echo "Exporting thumbnail ..."
+    $FFMPEG -ss $OFFSET -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumb.jpg"
+else
+    echo "Keeping thumbnail."
 fi
 
 echo "Done."
