@@ -83,7 +83,9 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
     echo "Exporting MP3 ..."
-    $MUSESCORE -o "$BASE.mp3" "$SCORE"
+    $MUSESCORE -o "$DIR/tmp.mp3" "$SCORE"
+    $FFMPEG -y -hide_banner -i "$DIR/tmp.mp3" -af "silenceremove=start_periods=1:start_duration=0:start_threshold=0.02" "$BASE.mp3"
+    rm -f "$DIR/tmp.mp3"
 else
     echo "Keeping MP3."
 fi
