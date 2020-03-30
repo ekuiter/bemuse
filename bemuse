@@ -128,16 +128,16 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
             FADE=", fade = type=in:duration=$FADE, fade = type=out:duration=$FADE:start_time=$(echo "$DURATION - $FADE" | bc)"
         fi
         $FFMPEG -y -hide_banner -i "$CHROMA" -i "$DIR/tmp.mp4" -filter_complex "
-            color = black:${WIDTH}x${HEIGHT}, trim = duration=$DURATION [background];
+            color = black:${WIDTH}x${HEIGHT}, fps = fps=$FRAMERATE, trim = duration=$DURATION [background];
             [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $FILTER [chroma];
             [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
             [background][chroma] overlay = $OVERLAY [background2];
-            [background2][keyboard] overlay [out]" -map "[out]" -r $FRAMERATE -crf 0 "$DIR/tmp2.mp4"
+            [background2][keyboard] overlay [out]" -map "[out]" -crf 0 "$DIR/tmp2.mp4"
     else
         cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
     fi
     OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
-    $FFMPEG -y -hide_banner -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac "$BASE.mp4"
+    $FFMPEG -y -hide_banner -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 "$BASE.mp4"
     rm -f "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
 else
     echo "Keeping MP4."
