@@ -1,11 +1,12 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [[--filter=<ffmpeg-filter>]] [--offset=<sec>] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--offset=<sec>] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
 OFFSET=3
+FADE=$OFFSET
 COLORKEY=0x000000:0.1:0.2
 OVERLAY=W/2-w/2:H/2-h/2
 
@@ -27,7 +28,8 @@ while getopts :-: OPT; do
     colorkey )  needs_arg; COLORKEY="$OPTARG" ;;
     scale )     needs_arg; SCALE="$OPTARG" ;;
     overlay )   needs_arg; OVERLAY="$OPTARG" ;;
-    filter )   needs_arg; FILTER="$OPTARG" ;;
+    filter )    needs_arg; FILTER="$OPTARG" ;;
+    fade )      needs_arg; FADE="$OPTARG" ;;
     offset )    needs_arg; OFFSET="$OPTARG" ;;
     visualize ) VISUALIZE=true ;;
     keep )      KEEP=true ;;
@@ -119,19 +121,23 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
         rm "$DIR/state.ini"
     fi
     if [[ ! -z $CHROMA ]]; then
-        DURATION=$($FFMPEG -i "$DIR/tmp.mp4" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
+        DURATION_MP3=$($FFMPEG -i "$BASE.mp3" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
             awk '{ split($1, A, ":"); split(A[3], B, "."); print 3600*A[1] + 60*A[2] + B[1] }')
+        DURATION=$(echo "$DURATION_MP3 + $OFFSET" | bc)
+        if [[ ! -z $FADE ]]; then
+            FADE=", fade = type=in:duration=$FADE, fade = type=out:duration=$FADE:start_time=$(echo "$DURATION - $FADE" | bc)"
+        fi
         $FFMPEG -y -hide_banner -i "$CHROMA" -i "$DIR/tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, trim = duration=$DURATION [background];
-            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FILTER [chroma];
-            [1:v] colorkey = $COLORKEY [keyboard];
+            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $FILTER [chroma];
+            [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
             [background][chroma] overlay = $OVERLAY [background2];
             [background2][keyboard] overlay [out]" -map "[out]" -r $FRAMERATE -crf 0 "$DIR/tmp2.mp4"
     else
         cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
     fi
     OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
-    $FFMPEG -y -hide_banner -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -shortest "$BASE.mp4"
+    $FFMPEG -y -hide_banner -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac "$BASE.mp4"
     rm -f "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
 else
     echo "Keeping MP4."
