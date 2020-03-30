@@ -5,7 +5,7 @@ USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
-OFFSET=3
+OFFSET=2.8
 FADE=3
 COLORKEY=0x000000:0.1:0.2
 OVERLAY=W/2-w/2:H/2-h/2
@@ -55,7 +55,7 @@ DIR=$(dirname "$SCORE")
 BASE=$DIR/$(basename "$SCORE" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [[ -z $STATE ]]; then STATE="$DIR/state.ini"; fi
+if [[ -z $STATE ]]; then STATE="$BASE.state.ini"; fi
 if [[ -z $SCALE ]]; then SCALE="$WIDTH:$HEIGHT"; fi
 if [[ ! -z $FILTER ]]; then FILTER=", $FILTER"; fi
 
@@ -74,12 +74,12 @@ else
 fi
 
 if [[ ! -z $VISUALIZE ]]; then
-	if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-		cp "$SELF/state.ini" "$DIR/state.ini"
+	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		cp "$SELF/state.ini" "$BASE.state.ini"
 	fi
 	$MIDI_VISUALIZER "$BASE.mid" "$STATE"
-	if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-		rm "$DIR/state.ini"
+	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+		rm "$BASE.state.ini"
 	fi
 	exit 0
 fi
@@ -93,9 +93,9 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
     echo "Exporting MP3 ..."
-    $MUSESCORE -o "$DIR/tmp.mp3" "$SCORE"
-    $FFMPEG -y -hide_banner -i "$DIR/tmp.mp3" -af "silenceremove=start_periods=1:start_duration=0:start_threshold=0.02" "$BASE.mp3"
-    rm -f "$DIR/tmp.mp3"
+    $MUSESCORE -o "$BASE.tmp.mp3" "$SCORE"
+    $FFMPEG -y -hide_banner -i "$BASE.tmp.mp3" -af "silenceremove=start_periods=1:start_duration=0:start_threshold=0.02" "$BASE.mp3"
+    rm -f "$BASE.tmp.mp3"
 else
     echo "Keeping MP3."
 fi
@@ -112,13 +112,13 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     echo "Exporting MP4 ..."
-    if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-        cp "$SELF/state.ini" "$DIR/state.ini"
+    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+        cp "$SELF/state.ini" "$BASE.state.ini"
     fi
     $MIDI_VISUALIZER "$BASE.mid" "$STATE" $WIDTH $HEIGHT $FRAMERATE \
-        | $FFMPEG -y -hide_banner -r $FRAMERATE -f image2pipe -vcodec ppm -i - -c:v libx264 -pix_fmt yuv420p -crf 0 "$DIR/tmp.mp4"
-    if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
-        rm "$DIR/state.ini"
+        | $FFMPEG -y -hide_banner -r $FRAMERATE -f image2pipe -vcodec ppm -i - -c:v libx264 -pix_fmt yuv420p -crf 0 "$BASE.tmp.mp4"
+    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+        rm "$BASE.state.ini"
     fi
     if [[ ! -z $CHROMA ]]; then
         DURATION_MP3=$($FFMPEG -i "$BASE.mp3" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
@@ -127,18 +127,18 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
         if [[ ! -z $FADE ]]; then
             FADE=", fade = type=in:duration=$FADE, fade = type=out:duration=$FADE:start_time=$(echo "$DURATION - $FADE" | bc)"
         fi
-        $FFMPEG -y -hide_banner -i "$CHROMA" -i "$DIR/tmp.mp4" -filter_complex "
+        $FFMPEG -y -hide_banner -i "$CHROMA" -i "$BASE.tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, fps = fps=$FRAMERATE, trim = duration=$DURATION [background];
             [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $FILTER [chroma];
             [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
             [background][chroma] overlay = $OVERLAY [background2];
-            [background2][keyboard] overlay [out]" -map "[out]" -crf 0 "$DIR/tmp2.mp4"
+            [background2][keyboard] overlay [out]" -map "[out]" -crf 0 "$BASE.tmp2.mp4"
     else
-        cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
+        cp "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
     fi
     OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
-    $FFMPEG -y -hide_banner -i "$DIR/tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 "$BASE.mp4"
-    rm -f "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
+    $FFMPEG -y -hide_banner -i "$BASE.tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 "$BASE.mp4"
+    rm -f "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
 else
     echo "Keeping MP4."
 fi
