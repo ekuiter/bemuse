@@ -1,12 +1,13 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--offset=<sec>] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [[--filter=<ffmpeg-filter>]] [--offset=<sec>] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
 OFFSET=3
 COLORKEY=0x000000:0.1:0.2
+OVERLAY=W/2-w/2:H/2-h/2
 
 die() { echo "$*" >&2; exit 2; }
 needs_arg() { if [ -z "$OPTARG" ]; then die "No arg for --$OPT option"; fi; }
@@ -25,6 +26,8 @@ while getopts :-: OPT; do
     chroma )    needs_arg; CHROMA="$OPTARG" ;;
     colorkey )  needs_arg; COLORKEY="$OPTARG" ;;
     scale )     needs_arg; SCALE="$OPTARG" ;;
+    overlay )   needs_arg; OVERLAY="$OPTARG" ;;
+    filter )   needs_arg; FILTER="$OPTARG" ;;
     offset )    needs_arg; OFFSET="$OPTARG" ;;
     visualize ) VISUALIZE=true ;;
     keep )      KEEP=true ;;
@@ -52,6 +55,7 @@ SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [[ -z $STATE ]]; then STATE="$DIR/state.ini"; fi
 if [[ -z $SCALE ]]; then SCALE="$WIDTH:$HEIGHT"; fi
+if [[ ! -z $FILTER ]]; then FILTER=", $FILTER"; fi
 
 # see https://github.com/ekuiter/MIDIVisualizer
 if uname -r | grep -q Microsoft; then
@@ -119,9 +123,9 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
             awk '{ split($1, A, ":"); split(A[3], B, "."); print 3600*A[1] + 60*A[2] + B[1] }')
         $FFMPEG -y -hide_banner -i "$CHROMA" -i "$DIR/tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, trim = duration=$DURATION [background];
-            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION [chroma];
+            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FILTER [chroma];
             [1:v] colorkey = $COLORKEY [keyboard];
-            [background][chroma] overlay = W/2-w/2:H/2-h/2 [background2];
+            [background][chroma] overlay = $OVERLAY [background2];
             [background2][keyboard] overlay [out]" -map "[out]" -r $FRAMERATE -crf 0 "$DIR/tmp2.mp4"
     else
         cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
