@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--offset=<sec>] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--offset=<sec>] [--visualize] [--keep] <score>"
 WIDTH=1280
 HEIGHT=720
 FRAMERATE=60
@@ -18,6 +18,7 @@ while getopts :-: OPT; do
     OPTARG="${OPTARG#=}"
   fi
   case "$OPT" in
+    state )     needs_arg; STATE="$OPTARG" ;;
     width )     needs_arg; WIDTH="$OPTARG" ;;
     height )    needs_arg; HEIGHT="$OPTARG" ;;
     framerate ) needs_arg; FRAMERATE="$OPTARG" ;;
@@ -49,6 +50,10 @@ DIR=$(dirname "$SCORE")
 BASE=$DIR/$(basename "$SCORE" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if [[ -z $STATE ]]; then
+    STATE="$DIR/state.ini"
+fi
+
 # see https://github.com/ekuiter/MIDIVisualizer
 if uname -r | grep -q Microsoft; then
     MIDI_VISUALIZER="$SELF/MIDIVisualizer.exe"
@@ -64,11 +69,11 @@ else
 fi
 
 if [[ ! -z $VISUALIZE ]]; then
-	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+	if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
 		cp "$SELF/state.ini" "$DIR/state.ini"
 	fi
-	$MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini"
-	if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+	$MIDI_VISUALIZER "$BASE.mid" "$STATE"
+	if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
 		rm "$DIR/state.ini"
 	fi
 	exit 0
@@ -105,11 +110,11 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     if [[ -z $KEEP ]] || [[ ! -d "$DIR/tmp" ]]; then
         rm -rf "$DIR/tmp"
         mkdir -p "$DIR/tmp"
-        if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+        if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
             cp "$SELF/state.ini" "$DIR/state.ini"
         fi
-        $MIDI_VISUALIZER "$BASE.mid" "$DIR/state.ini" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
-        if [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+        $MIDI_VISUALIZER "$BASE.mid" "$STATE" "$DIR/tmp" $WIDTH $HEIGHT $FRAMERATE
+        if [ "$STATE" = "$DIR/state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
             rm "$DIR/state.ini"
         fi
     fi
