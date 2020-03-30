@@ -122,7 +122,7 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
             [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION [chroma];
             [1:v] colorkey = $COLORKEY [keyboard];
             [background][chroma] overlay = W/2-w/2:H/2-h/2 [background2];
-            [background2][keyboard] overlay [out]" -map "[out]" -r $FRAMERATE "$DIR/tmp2.mp4"
+            [background2][keyboard] overlay [out]" -map "[out]" -r $FRAMERATE -crf 0 "$DIR/tmp2.mp4"
     else
         cp "$DIR/tmp.mp4" "$DIR/tmp2.mp4"
     fi
