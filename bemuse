@@ -1,11 +1,12 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--offset=<sec>] [--duration=<sec>] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
-OFFSET=3.5
+AUDIO_OFFSET=3.5
+VIDEO_OFFSET=0
 FADE=3
 COLORKEY=0x000000:0.2:0.2
 OVERLAY=W/2-w/2:H/2-h/2
@@ -20,22 +21,23 @@ while getopts :-: OPT; do
     OPTARG="${OPTARG#=}"
   fi
   case "$OPT" in
-    state )     needs_arg; STATE="$OPTARG" ;;
-    width )     needs_arg; WIDTH="$OPTARG" ;;
-    height )    needs_arg; HEIGHT="$OPTARG" ;;
-    framerate ) needs_arg; FRAMERATE="$OPTARG" ;;
-    chroma )    needs_arg; CHROMA="$OPTARG" ;;
-    colorkey )  needs_arg; COLORKEY="$OPTARG" ;;
-    scale )     needs_arg; SCALE="$OPTARG" ;;
-    overlay )   needs_arg; OVERLAY="$OPTARG" ;;
-    filter )    needs_arg; FILTER="$OPTARG" ;;
-    fade )      needs_arg; FADE="$OPTARG" ;;
-    offset )    needs_arg; OFFSET="$OPTARG" ;;
-    duration )  needs_arg; DURATION="$OPTARG" ;;
-    visualize ) VISUALIZE=true ;;
-    keep )      KEEP=true ;;
-    ??* )       die "Illegal option --$OPT" ;;
-    \? )        die $USAGE ;;
+    state )        needs_arg; STATE="$OPTARG" ;;
+    width )        needs_arg; WIDTH="$OPTARG" ;;
+    height )       needs_arg; HEIGHT="$OPTARG" ;;
+    framerate )    needs_arg; FRAMERATE="$OPTARG" ;;
+    chroma )       needs_arg; CHROMA="$OPTARG" ;;
+    colorkey )     needs_arg; COLORKEY="$OPTARG" ;;
+    scale )        needs_arg; SCALE="$OPTARG" ;;
+    overlay )      needs_arg; OVERLAY="$OPTARG" ;;
+    filter )       needs_arg; FILTER="$OPTARG" ;;
+    fade )         needs_arg; FADE="$OPTARG" ;;
+    audio-offset ) needs_arg; AUDIO_OFFSET="$OPTARG" ;;
+    video-offset ) needs_arg; VIDEO_OFFSET="$OPTARG" ;;
+    duration )     needs_arg; DURATION="$OPTARG" ;;
+    visualize )    VISUALIZE=true ;;
+    keep )         KEEP=true ;;
+    ??* )          die "Illegal option --$OPT" ;;
+    \? )           die $USAGE ;;
   esac
 done
 shift $((OPTIND-1))
@@ -116,7 +118,7 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     if [[ -z $DURATION ]]; then
         DURATION_MP3=$($FFMPEG -i "$BASE.mp3" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
             awk '{ split($1, A, ":"); split(A[3], B, "."); print 3600*A[1] + 60*A[2] + B[1] }')
-        DURATION=$(echo "$DURATION_MP3 + $OFFSET" | bc)
+        DURATION=$(echo "$DURATION_MP3 + $AUDIO_OFFSET" | bc)
     fi
     if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
         cp "$SELF/state.ini" "$BASE.state.ini"
@@ -128,18 +130,21 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
     fi
     if [[ ! -z $CHROMA ]]; then
         if [[ ! -z $FADE ]]; then
-            FADE=", fade = type=in:duration=$FADE, fade = type=out:duration=$FADE:start_time=$(echo "$DURATION - $FADE" | bc)"
+            FADE=", fade = type=in:duration=$FADE, fade = type=out:duration=$FADE:start_time=$(echo "$DURATION - $FADE - $VIDEO_OFFSET" | bc)"
+        fi
+        if [[ ! -z $VIDEO_OFFSET ]]; then
+            SETPTS=", setpts = PTS+$VIDEO_OFFSET/TB"
         fi
         $FFMPEG -y -hide_banner -i "$CHROMA" -i "$BASE.tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, fps = fps=$FRAMERATE, trim = duration=$DURATION [background];
-            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $FILTER [chroma];
+            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $SETPTS $FILTER [chroma];
             [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
             [background][chroma] overlay = $OVERLAY [background2];
             [background2][keyboard] overlay [out]" -map "[out]" -crf 0 "$BASE.tmp2.mp4"
     else
         cp "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
     fi
-    OFFSET_MS=$(echo "$OFFSET * 1000 / 1" | bc)
+    OFFSET_MS=$(echo "$AUDIO_OFFSET * 1000 / 1" | bc)
     $FFMPEG -y -hide_banner -i "$BASE.tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 -shortest "$BASE.mp4"
     rm -f "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
 else
@@ -148,7 +153,7 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.thumb.jpg" ]]; then
     echo "Exporting thumbnail ..."
-    $FFMPEG -y -hide_banner -ss $OFFSET -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumb.jpg"
+    $FFMPEG -y -hide_banner -ss $AUDIO_OFFSET -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumb.jpg"
 else
     echo "Keeping thumbnail."
 fi
