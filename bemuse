@@ -5,7 +5,7 @@ USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
-OFFSET=2.8
+OFFSET=3.3
 FADE=3
 COLORKEY=0x000000:0.1:0.2
 OVERLAY=W/2-w/2:H/2-h/2
