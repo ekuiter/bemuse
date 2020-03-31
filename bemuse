@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--skip-video] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
@@ -34,6 +34,7 @@ while getopts :-: OPT; do
     audio-offset ) needs_arg; AUDIO_OFFSET="$OPTARG" ;;
     video-offset ) needs_arg; VIDEO_OFFSET="$OPTARG" ;;
     duration )     needs_arg; DURATION="$OPTARG" ;;
+    skip-video )   SKIP_VIDEO=true ;;
     visualize )    VISUALIZE=true ;;
     keep )         KEEP=true ;;
     ??* )          die "Illegal option --$OPT" ;;
@@ -113,7 +114,7 @@ else
     echo "Keeping JPG."
 fi
 
-if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
+if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]); then
     echo "Exporting MP4 ..."
     if [[ -z $DURATION ]]; then
         DURATION_MP3=$($FFMPEG -i "$BASE.mp3" 2>&1 | grep Duration | cut -d" " -f4 | sed "s/,//" | sed "s@\..*@@g" | \
@@ -137,7 +138,7 @@ if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]; then
         fi
         $FFMPEG -y -hide_banner -i "$CHROMA" -i "$BASE.tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, fps = fps=$FRAMERATE, trim = duration=$DURATION [background];
-            [0:v] scale = $SCALE, setsar = 1:1, trim = duration=$DURATION $FADE $SETPTS $FILTER [chroma];
+            [0:v] scale = $SCALE, setsar = 1:1 $FILTER, trim = duration=$DURATION $FADE $SETPTS [chroma];
             [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
             [background][chroma] overlay = $OVERLAY [background2];
             [background2][keyboard] overlay [out]" -map "[out]" -crf 0 "$BASE.tmp2.mp4"
@@ -151,7 +152,7 @@ else
     echo "Keeping MP4."
 fi
 
-if [[ -z $KEEP ]] || [[ ! -f "$BASE.thumb.jpg" ]]; then
+if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.thumb.jpg" ]]); then
     echo "Exporting thumbnail ..."
     $FFMPEG -y -hide_banner -ss $AUDIO_OFFSET -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumb.jpg"
 else
