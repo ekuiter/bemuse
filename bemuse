@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--skip-video] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--skip-video] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
@@ -21,6 +21,7 @@ while getopts :-: OPT; do
     OPTARG="${OPTARG#=}"
   fi
   case "$OPT" in
+    directory )    needs_arg; DIRECTORY="$OPTARG" ;;
     state )        needs_arg; STATE="$OPTARG" ;;
     width )        needs_arg; WIDTH="$OPTARG" ;;
     height )       needs_arg; HEIGHT="$OPTARG" ;;
@@ -55,10 +56,16 @@ if command -v musescore > /dev/null;      then MUSESCORE=musescore; fi
 if command -v MuseScore3.exe > /dev/null; then MUSESCORE=MuseScore3.exe; fi
 if [[ -z $MUSESCORE ]];                   then die "MuseScore not found, check PATH!"; fi
 
-DIR=$(dirname "$SCORE")
+if [[ -z $DIRECTORY ]]; then
+    DIR=$(dirname "$SCORE")
+else
+    DIR=$DIRECTORY
+    mkdir -p $DIR
+fi
 BASE=$DIR/$(basename "$SCORE" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if [[ ! -z $DIRECTORY ]]; then cp "$SCORE" "$BASE.mscz"; fi
 if [[ -z $STATE ]]; then STATE="$BASE.state.ini"; fi
 if [[ -z $SCALE ]]; then SCALE="$WIDTH:$HEIGHT"; fi
 if [[ ! -z $FILTER ]]; then FILTER=", $FILTER"; fi
@@ -72,17 +79,17 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mid" ]]; then
     echo "Exporting MIDI ..."
-    $MUSESCORE -o "$BASE.mid" "$SCORE"
+    $MUSESCORE -o "$BASE.mid" "$BASE.mscz"
 else
     echo "Keeping MIDI."
 fi
 
 if [[ ! -z $VISUALIZE ]]; then
-	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
 		cp "$SELF/state.ini" "$BASE.state.ini"
 	fi
 	$MIDI_VISUALIZER "$BASE.mid" "$STATE"
-	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+	if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
 		rm "$BASE.state.ini"
 	fi
 	exit 0
@@ -90,14 +97,14 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.pdf" ]]; then
     echo "Exporting PDF ..."
-    $MUSESCORE -o "$BASE.pdf" "$SCORE"
+    $MUSESCORE -o "$BASE.pdf" "$BASE.mscz"
 else
     echo "Keeping PDF."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
     echo "Exporting MP3 ..."
-    $MUSESCORE -o "$BASE.tmp.mp3" "$SCORE"
+    $MUSESCORE -o "$BASE.tmp.mp3" "$BASE.mscz"
     $FFMPEG -y -hide_banner -i "$BASE.tmp.mp3" -af "silenceremove=start_periods=1:start_duration=0:start_threshold=0.02" "$BASE.mp3"
     rm -f "$BASE.tmp.mp3"
 else
@@ -106,7 +113,7 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]; then
     echo "Exporting JPG ..."
-    $MUSESCORE -o "$BASE.png" "$SCORE"
+    $MUSESCORE -o "$BASE.png" "$BASE.mscz"
     FIRST_PAGE=$(ls "$BASE-"*".png" | head -n1)
     convert "$FIRST_PAGE" -resize 50% -background white -flatten "$BASE.jpg"
     rm "$BASE-"*".png"
@@ -121,12 +128,12 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]); then
             awk '{ split($1, A, ":"); split(A[3], B, "."); print 3600*A[1] + 60*A[2] + B[1] }')
         DURATION=$(echo "$DURATION_MP3 + $AUDIO_OFFSET" | bc)
     fi
-    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
         cp "$SELF/state.ini" "$BASE.state.ini"
     fi
     $MIDI_VISUALIZER "$BASE.mid" "$STATE" $WIDTH $HEIGHT $FRAMERATE \
         | $FFMPEG -y -hide_banner -r $FRAMERATE -f image2pipe -vcodec ppm -t $DURATION -i - -c:v libx264 -pix_fmt yuv420p -crf 0 "$BASE.tmp.mp4"
-    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath $SELF)" != "$(realpath $DIR)" ]; then
+    if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
         rm "$BASE.state.ini"
     fi
     if [[ ! -z $CHROMA ]]; then
