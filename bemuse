@@ -282,4 +282,20 @@ fi
 
 if [[ ! -z $SHEETHOST_URL ]]; then echo "Sheet published at: $SHEETHOST_URL"; fi
 if [[ ! -z $YOUTUBE_URL ]]; then echo "Video published at: $YOUTUBE_URL"; fi
+
+if [[ ! -z $NUM ]] && [[ ! -z $SHEETHOST_URL ]] && [[ ! -z $YOUTUBE_URL ]]; then
+    cat << EOF
+HTML code:
+
+<li>
+    <p>$NUM. <strong>$TITLE</strong></p>
+    <ul>
+        <li><a href="$YOUTUBE_URL" target="_blank">Listen</a></li>
+        <li><a href="$SHEETHOST_URL" target="_blank">Download</a></li>
+    </ul>
+</li>
+
+EOF
+fi
+
 echo "Done."
