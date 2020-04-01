@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--skip-video] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--thumbnail-convert=<convert-options>] [--skip-video] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
@@ -21,27 +21,28 @@ while getopts :-: OPT; do
     OPTARG="${OPTARG#=}"
   fi
   case "$OPT" in
-    directory )      needs_arg; DIRECTORY="$OPTARG" ;;
-    state )          needs_arg; STATE="$OPTARG" ;;
-    width )          needs_arg; WIDTH="$OPTARG" ;;
-    height )         needs_arg; HEIGHT="$OPTARG" ;;
-    framerate )      needs_arg; FRAMERATE="$OPTARG" ;;
-    chroma )         needs_arg; CHROMA="$OPTARG" ;;
-    colorkey )       needs_arg; COLORKEY="$OPTARG" ;;
-    scale )          needs_arg; SCALE="$OPTARG" ;;
-    overlay )        needs_arg; OVERLAY="$OPTARG" ;;
-    filter )         needs_arg; FILTER="$OPTARG" ;;
-    fade )           needs_arg; FADE="$OPTARG" ;;
-    audio-offset )   needs_arg; AUDIO_OFFSET="$OPTARG" ;;
-    video-offset )   needs_arg; VIDEO_OFFSET="$OPTARG" ;;
-    duration )       needs_arg; DURATION="$OPTARG" ;;
-    thumbnail-from ) needs_arg; THUMBNAIL_FROM="$OPTARG" ;;
-    thumbnail-to )   needs_arg; THUMBNAIL_TO="$OPTARG" ;;
-    skip-video )     SKIP_VIDEO=true ;;
-    visualize )      VISUALIZE=true ;;
-    keep )           KEEP=true ;;
-    ??* )            die "Illegal option --$OPT" ;;
-    \? )             die $USAGE ;;
+    directory )         needs_arg; DIRECTORY="$OPTARG" ;;
+    state )             needs_arg; STATE="$OPTARG" ;;
+    width )             needs_arg; WIDTH="$OPTARG" ;;
+    height )            needs_arg; HEIGHT="$OPTARG" ;;
+    framerate )         needs_arg; FRAMERATE="$OPTARG" ;;
+    chroma )            needs_arg; CHROMA="$OPTARG" ;;
+    colorkey )          needs_arg; COLORKEY="$OPTARG" ;;
+    scale )             needs_arg; SCALE="$OPTARG" ;;
+    overlay )           needs_arg; OVERLAY="$OPTARG" ;;
+    filter )            needs_arg; FILTER="$OPTARG" ;;
+    fade )              needs_arg; FADE="$OPTARG" ;;
+    audio-offset )      needs_arg; AUDIO_OFFSET="$OPTARG" ;;
+    video-offset )      needs_arg; VIDEO_OFFSET="$OPTARG" ;;
+    duration )          needs_arg; DURATION="$OPTARG" ;;
+    thumbnail-from )    needs_arg; THUMBNAIL_FROM="$OPTARG" ;;
+    thumbnail-to )      needs_arg; THUMBNAIL_TO="$OPTARG" ;;
+    thumbnail-convert ) needs_arg; THUMBNAIL_CONVERT="$OPTARG" ;;
+    skip-video )        SKIP_VIDEO=true ;;
+    visualize )         VISUALIZE=true ;;
+    keep )              KEEP=true ;;
+    ??* )               die "Illegal option --$OPT" ;;
+    \? )                die $USAGE ;;
   esac
 done
 shift $((OPTIND-1))
@@ -168,6 +169,7 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.thumbnail.jpg" ]]);
         THUMBNAIL_TO="-t $THUMBNAIL_TO"
     fi
     $FFMPEG -y -hide_banner -ss $THUMBNAIL_FROM $THUMBNAIL_TO -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumbnail.jpg"
+    convert "$BASE.thumbnail.jpg" $THUMBNAIL_CONVERT "$BASE.thumbnail.jpg"
 else
     echo "Keeping thumbnail."
 fi
