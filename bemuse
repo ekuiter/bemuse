@@ -61,7 +61,9 @@ if command -v ffmpeg > /dev/null;         then FFMPEG=ffmpeg; fi
 if command -v ffmpeg.exe > /dev/null;     then FFMPEG=ffmpeg.exe; fi
 if [[ -z $FFMPEG ]];                      then die "ffmpeg not found, check PATH!"; fi
 if command -v mscore > /dev/null;         then MUSESCORE=mscore; fi
+if command -v mscore3 > /dev/null;        then MUSESCORE=mscore3; fi
 if command -v musescore > /dev/null;      then MUSESCORE=musescore; fi
+if command -v musescore3 > /dev/null;     then MUSESCORE=musescore3; fi
 if command -v MuseScore3.exe > /dev/null; then MUSESCORE=MuseScore3.exe; fi
 if [[ -z $MUSESCORE ]];                   then die "MuseScore not found, check PATH!"; fi
 
