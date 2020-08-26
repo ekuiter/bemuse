@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--thumbnail-convert=<convert-options>] [--sheethost-metadata=<metadata>] [--sheethost-username=<username>] [--sheethost-password=<password>] [--youtube-options=<options>] [--youtube-secret=<secret>] [--skip-video] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--thumbnail-convert=<convert-options>] [--sheethost-metadata=<metadata>] [--sheethost-username=<username>] [--sheethost-password=<password>] [--youtube-options=<options>] [--youtube-secret=<secret>] [--skip-video] [--skip-jpg] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
@@ -44,6 +44,7 @@ while getopts :-: OPT; do
     youtube-options )    needs_arg; YOUTUBE_OPTIONS="$OPTARG" ;;
     youtube-secret )     needs_arg; YOUTUBE_SECRET="$OPTARG" ;;
     skip-video )         SKIP_VIDEO=true ;;
+    skip-jpg )           SKIP_JPG=true ;;
     visualize )          VISUALIZE=true ;;
     keep )               KEEP=true ;;
     ??* )                die "Illegal option --$OPT" ;;
@@ -120,7 +121,7 @@ else
     echo "Keeping MP3."
 fi
 
-if [[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]; then
+if [[ -z $SKIP_JPG ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]); then
     echo "Exporting JPG ..."
     $MUSESCORE -o "$BASE.png" "$BASE.mscz"
     FIRST_PAGE=$(ls "$BASE-"*".png" | head -n1)
