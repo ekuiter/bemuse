@@ -84,7 +84,7 @@ if [[ -z $THUMBNAIL_FROM ]]; then THUMBNAIL_FROM=$AUDIO_OFFSET; fi
 if [[ ! -z $FILTER ]]; then FILTER=", $FILTER"; fi
 
 # see https://github.com/ekuiter/MIDIVisualizer
-if uname -r | grep -q Microsoft; then
+if uname -r | grep -q microsoft; then
     MIDI_VISUALIZER="$SELF/MIDIVisualizer.exe"
 else
     MIDI_VISUALIZER="$SELF/MIDIVisualizer"
