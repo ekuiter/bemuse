@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--thumbnail-convert=<convert-options>] [--sheethost-metadata=<metadata>] [--sheethost-username=<username>] [--sheethost-password=<password>] [--youtube-options=<options>] [--youtube-secret=<secret>] [--skip-video] [--skip-jpg] [--skip-ffmpeg-mp3] [--visualize] [--keep] <score>"
+USAGE="usage: $0 [--directory=<directory>] [--state=<state>] [--width=<px>] [--height=<px>] [--framerate=<fps>] [--chroma=<ffmpeg-input>] [--colorkey=<ffmpeg-colorkey>] [--scale=<ffmpeg-scale>] [--overlay=<ffmpeg-overlay>] [--filter=<ffmpeg-filter>] [--fade=<sec>] [--audio-offset=<sec>] [--video-offset=<sec>] [--duration=<sec>] [--thumbnail-from=<sec>] [--thumbnail-to=<sec>] [--thumbnail-convert=<convert-options>] [--sheethost-metadata=<metadata>] [--sheethost-username=<username>] [--sheethost-password=<password>] [--youtube-options=<options>] [--youtube-secret=<secret>] [--skip-video] [--skip-thumbnail] [--skip-jpg] [--skip-ffmpeg-mp3] [--visualize] [--keep] <score>"
 WIDTH=1920
 HEIGHT=1080
 FRAMERATE=60
@@ -44,6 +44,7 @@ while getopts :-: OPT; do
     youtube-options )    needs_arg; YOUTUBE_OPTIONS="$OPTARG" ;;
     youtube-secret )     needs_arg; YOUTUBE_SECRET="$OPTARG" ;;
     skip-video )         SKIP_VIDEO=true ;;
+    skip-thumbnail )     SKIP_THUMBNAIL=true ;;
     skip-jpg )           SKIP_JPG=true ;;
     skip-ffmpeg-mp3 )    SKIP_FFMPEG_MP3=true ;;
     visualize )          VISUALIZE=true ;;
@@ -179,7 +180,7 @@ else
     echo "Keeping MP4."
 fi
 
-if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.thumbnail.jpg" ]]); then
+if [[ -z $SKIP_THUMBNAIL ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.thumbnail.jpg" ]]); then
     echo "Exporting thumbnail ..."
     if [[ ! -z $THUMBNAIL_TO ]]; then
         THUMBNAIL_TO="-t $THUMBNAIL_TO"

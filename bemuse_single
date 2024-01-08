@@ -2,17 +2,19 @@
 set -e
 shopt -s nullglob
 file=$1
-bemuse=("$(dirname "$0")/bemuse" --skip-jpg --keep)
+bemuse=("$(dirname "$0")/bemuse" --skip-thumbnail --skip-jpg --keep)
+echo
+echo "$file"
+"${bemuse[@]}" "$file"
 rm -rf "$(dirname "$0")/tmp"
 unzip -q "$file" -d "$(dirname "$0")/tmp"
 for f in "$(dirname "$0")/tmp/Excerpts/"*/*.mscx; do
 	new_f="$(dirname "$file")/Stimmen/$(echo "$(basename "$f" | cut -d_ -f2-)")"
 	mkdir -p "$(dirname "$file")/Stimmen"
 	cp "$f" "$new_f"
-	echo "${bemuse[@]}" "$new_f"
+	echo
+	echo "$new_f"
 	"${bemuse[@]}" "$new_f"
 	rm "$new_f"
 done
 rm -rf "$(dirname "$0")/tmp"
-echo "${bemuse[@]}" "$file"
-"${bemuse[@]}" "$file"
