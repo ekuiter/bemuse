@@ -1,0 +1,3 @@
+#!/bin/bash
+set -e
+find "$1" -iname '*.mscz' -exec "$(dirname "$0")/bemuse_single" {} ';'

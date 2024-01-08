@@ -62,9 +62,12 @@ if command -v ffmpeg > /dev/null;         then FFMPEG=ffmpeg; fi
 if command -v ffmpeg.exe > /dev/null;     then FFMPEG=ffmpeg.exe; fi
 if [[ -z $FFMPEG ]];                      then die "ffmpeg not found, check PATH!"; fi
 if command -v mscore > /dev/null;         then MUSESCORE=mscore; fi
+if command -v mscore4 > /dev/null;        then MUSESCORE=mscore4; fi
 if command -v mscore3 > /dev/null;        then MUSESCORE=mscore3; fi
 if command -v musescore > /dev/null;      then MUSESCORE=musescore; fi
+if command -v musescore4 > /dev/null;     then MUSESCORE=musescore4; fi
 if command -v musescore3 > /dev/null;     then MUSESCORE=musescore3; fi
+if command -v MuseScore4.exe > /dev/null; then MUSESCORE=MuseScore4.exe; fi
 if command -v MuseScore3.exe > /dev/null; then MUSESCORE=MuseScore3.exe; fi
 if [[ -z $MUSESCORE ]];                   then die "MuseScore not found, check PATH!"; fi
 
@@ -74,7 +77,7 @@ else
     DIR=$DIRECTORY
     mkdir -p $DIR
 fi
-BASE=$DIR/$(basename "$SCORE" .mscz)
+BASE=$DIR/$(basename "$(basename "$SCORE" .mscx)" .mscz)
 SELF="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [[ ! -z $DIRECTORY ]]; then cp "$SCORE" "$BASE.mscz"; fi
@@ -92,7 +95,7 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mid" ]]; then
     echo "Exporting MIDI ..."
-    $MUSESCORE -o "$BASE.mid" "$BASE.mscz"
+    "$MUSESCORE" -o "$BASE.mid" "$BASE.msc"*
 else
     echo "Keeping MIDI."
 fi
@@ -110,14 +113,14 @@ fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.pdf" ]]; then
     echo "Exporting PDF ..."
-    $MUSESCORE -o "$BASE.pdf" "$BASE.mscz"
+    "$MUSESCORE" -o "$BASE.pdf" "$BASE.msc"*
 else
     echo "Keeping PDF."
 fi
 
 if [[ -z $KEEP ]] || [[ ! -f "$BASE.mp3" ]]; then
     echo "Exporting MP3 ..."
-    $MUSESCORE -o "$BASE.tmp.mp3" "$BASE.mscz"
+    "$MUSESCORE" -o "$BASE.tmp.mp3" "$BASE.msc"*
     if [[ -z $SKIP_FFMPEG_MP3 ]]; then
         $FFMPEG -y -hide_banner -i "$BASE.tmp.mp3" -af "silenceremove=start_periods=1:start_duration=0:start_threshold=0.02" "$BASE.mp3"
         rm -f "$BASE.tmp.mp3"
@@ -130,7 +133,7 @@ fi
 
 if [[ -z $SKIP_JPG ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.jpg" ]]); then
     echo "Exporting JPG ..."
-    $MUSESCORE -o "$BASE.png" "$BASE.mscz"
+    "$MUSESCORE" -o "$BASE.png" "$BASE.msc"*
     FIRST_PAGE=$(ls "$BASE-"*".png" | head -n1)
     convert "$FIRST_PAGE" -resize 50% -background white -flatten "$BASE.jpg"
     rm "$BASE-"*".png"
@@ -148,7 +151,7 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]); then
     if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
         cp "$SELF/state.ini" "$BASE.state.ini"
     fi
-    $MIDI_VISUALIZER "$BASE.mid" "$STATE" $WIDTH $HEIGHT $FRAMERATE \
+    "$MIDI_VISUALIZER" "$BASE.mid" "$STATE" $WIDTH $HEIGHT $FRAMERATE \
         | $FFMPEG -y -hide_banner -r $FRAMERATE -f image2pipe -vcodec ppm -t $DURATION -i - -c:v libx264 -pix_fmt yuv420p -crf 0 "$BASE.tmp.mp4"
     if [ "$STATE" = "$BASE.state.ini" ] && [ "$(realpath "$SELF")" != "$(realpath "$DIR")" ]; then
         rm "$BASE.state.ini"
@@ -160,7 +163,7 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]); then
         if [[ ! -z $VIDEO_OFFSET ]]; then
             SETPTS=", setpts = PTS+$VIDEO_OFFSET/TB"
         fi
-        $FFMPEG -y -hide_banner -i "$CHROMA" -i "$BASE.tmp.mp4" -filter_complex "
+        "$FFMPEG" -y -hide_banner -i "$CHROMA" -i "$BASE.tmp.mp4" -filter_complex "
             color = black:${WIDTH}x${HEIGHT}, fps = fps=$FRAMERATE, trim = duration=$DURATION [background];
             [0:v] scale = $SCALE, setsar = 1:1 $FILTER, trim = duration=$DURATION $FADE $SETPTS [chroma];
             [1:v] colorkey = $COLORKEY, trim = duration=$DURATION [keyboard];
@@ -170,7 +173,7 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.mp4" ]]); then
         cp "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
     fi
     OFFSET_MS=$(echo "$AUDIO_OFFSET * 1000 / 1" | bc)
-    $FFMPEG -y -hide_banner -i "$BASE.tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 -shortest "$BASE.mp4"
+    "$FFMPEG" -y -hide_banner -i "$BASE.tmp2.mp4" -i "$BASE.mp3" -af "adelay=$OFFSET_MS|$OFFSET_MS" -c:a aac -crf 17 -shortest "$BASE.mp4"
     rm -f "$BASE.tmp.mp4" "$BASE.tmp2.mp4"
 else
     echo "Keeping MP4."
@@ -181,7 +184,7 @@ if [[ -z $SKIP_VIDEO ]] && ([[ -z $KEEP ]] || [[ ! -f "$BASE.thumbnail.jpg" ]]);
     if [[ ! -z $THUMBNAIL_TO ]]; then
         THUMBNAIL_TO="-t $THUMBNAIL_TO"
     fi
-    $FFMPEG -y -hide_banner -ss $THUMBNAIL_FROM $THUMBNAIL_TO -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumbnail.jpg"
+    "$FFMPEG" -y -hide_banner -ss $THUMBNAIL_FROM $THUMBNAIL_TO -i "$BASE.mp4" -vf thumbnail -frames:v 1 "$BASE.thumbnail.jpg"
     convert "$BASE.thumbnail.jpg" $THUMBNAIL_CONVERT "$BASE.thumbnail.jpg"
 else
     echo "Keeping thumbnail."
@@ -253,7 +256,7 @@ if [[ ! -z $SHEETHOST_METADATA ]] && [[ ! -z $SHEETHOST_USERNAME ]] && [[ ! -z $
             upload_file "$BASE.jpg"
             upload_file "$BASE.pdf"
             upload_file "$BASE.mid"
-            upload_file "$BASE.mscz"
+            upload_file "$BASE.msc"*
 
             echo "Publishing sheet ..."
             curl -b "$BASE.session" -H "X-Requested-With: XMLHttpRequest" \
