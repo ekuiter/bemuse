@@ -1,3 +1,6 @@
 #!/bin/bash
+shopt -s globstar
 set -e
-find "$1" -iname '*.mscz' -exec "$(dirname "$0")/bemuse_single" {} ';'
+for f in "$1"/**/*.mscz; do
+	"$(dirname "$0")/bemuse_single" "$f"
+done
