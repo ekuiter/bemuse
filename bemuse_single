@@ -5,7 +5,7 @@ file=$1
 bemuse=("$(dirname "$0")/bemuse" --skip-thumbnail --skip-jpg --keep)
 echo
 echo "$file"
-"${bemuse[@]}" "$file"
+#"${bemuse[@]}" "$file"
 rm -rf "$(dirname "$0")/tmp"
 unzip -q "$file" -d "$(dirname "$0")/tmp"
 for f in "$(dirname "$0")/tmp/Excerpts/"*/*.mscx; do
@@ -14,6 +14,7 @@ for f in "$(dirname "$0")/tmp/Excerpts/"*/*.mscx; do
 	cp "$f" "$new_f"
 	echo
 	echo "$new_f"
+	sed -i 's/<Instrument id=".*">/<Instrument id="piano">/' "$new_f"
 	"${bemuse[@]}" "$new_f"
 	rm "$new_f"
 done
